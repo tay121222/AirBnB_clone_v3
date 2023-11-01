@@ -8,6 +8,7 @@ from api.v1.views import app_views
 from models.city import City
 from models.place import Place
 from models.user import User
+from models.state import State
 
 
 @app_views.route('/cities/<city_id>/places', strict_slashes=False,
@@ -88,7 +89,7 @@ def search_places():
     if data is None:
         return jsonify({"error": "Not a JSON"}), 400
 
-    states = data.get('states', [])
+    state_ids = data.get('states', [])
     cities = data.get('cities', [])
     amenities = data.get('amenities', [])
 
@@ -96,13 +97,17 @@ def search_places():
 
     results = []
 
-    if not states and not cities and not amenities:
+    if not state_ids and not cities and not amenities:
         results = all_places
     else:
+        states = [storage.get(State, state_id) for state_id in state_ids]
         for place in all_places:
-            if place.city_id in cities or (
-                    place.city_id in states and place not in results
-                    ):
+            if (place.city_id in cities or
+                    (place.city_id in [
+                        c.id for s in states for c in s.cities
+                    ]) or
+                    place.city_id in [c.id for c in cities for s in states] or
+                    place.city_id in states):
                 results.append(place)
 
         if amenities:
