@@ -9,6 +9,7 @@ from models.city import City
 from models.place import Place
 from models.user import User
 from models.state import State
+from models.amenity import Amenity
 
 
 @app_views.route('/cities/<city_id>/places', strict_slashes=False,
@@ -91,31 +92,34 @@ def search_places():
 
     state_ids = data.get('states', [])
     cities = data.get('cities', [])
-    amenities = data.get('amenities', [])
+    amenity_ids = data.get('amenities', [])
 
     all_places = storage.all("Place").values()
 
     results = []
 
-    if not state_ids and not cities and not amenities:
+    if not state_ids and not cities and not amenity_ids:
         results = all_places
     else:
         states = [storage.get(State, state_id) for state_id in state_ids]
+        amenity_objects = [
+            storage.get(Amenity, amenity_id) for amenity_id in amenity_ids
+        ]
         for place in all_places:
             if (place.city_id in cities or
                     (place.city_id in [
                         c.id for s in states for c in s.cities
-                    ]) or
+                    ] if states else []) or
                     place.city_id in [c.id for c in cities for s in states] or
                     place.city_id in states):
                 results.append(place)
 
-        if amenities:
+        if amenity_ids:
             results = [
                 place for place in results
-                if all(amenity.id in [
-                    a.id for a in place.amenities
-                ] for amenity in amenities)
+                if all(
+                    amenity in place.amenities for amenity in amenity_objects
+                    )
             ]
 
     return jsonify([place.to_dict() for place in results])
